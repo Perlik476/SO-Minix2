@@ -33,9 +33,9 @@ cd /usr/src/minix/fs/procfs
 cd /usr/src/minix/servers/pm
 make && make install
 cd /usr/src/minix/servers/sched
-#make && make install
+make && make install
 cd /usr/src/minix/kernel
-#make && make install
+make && make install
 cd /usr/src/minix/kernel/system
 #make && make install
 cd /usr/src/lib/libc
