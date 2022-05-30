@@ -33,6 +33,7 @@ struct proc {
 				   FIXME remove this */
   struct proc *p_scheduler;	/* who should get out of quantum msg */
   unsigned p_cpu;		/* what CPU is the process running on */
+
 #ifdef CONFIG_SMP
   bitchunk_t p_cpu_mask[BITMAP_CHUNKS(CONFIG_MAX_CPUS)]; /* what CPUs is the
 							    process allowed to
@@ -131,6 +132,8 @@ struct proc {
 #if DEBUG_TRACE
   int p_schedules;
 #endif
+
+  int p_bucket_nr;
 };
 
 #endif /* __ASSEMBLY__ */

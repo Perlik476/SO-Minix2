@@ -1536,24 +1536,41 @@ void enqueue(
  * process is assigned to.
  */
   int q = rp->p_priority;	 		/* scheduling queue to use */
-  struct proc **rdy_head, **rdy_tail;
+  struct proc **rdy_head, **rdy_tail, **bkt_head, **bkt_tail;
   
   assert(proc_is_runnable(rp));
 
   assert(q >= 0);
 
-  rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
-  rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
+  if (q == BUCKET_Q) {
+      int bucket_nr = rp->p_bucket_nr;
 
-  /* Now add the process to the queue. */
-  if (!rdy_head[q]) {		/* add to empty queue */
-      rdy_head[q] = rdy_tail[q] = rp; 		/* create a new queue */
-      rp->p_nextready = NULL;		/* mark new end */
-  } 
-  else {					/* add to tail of queue */
-      rdy_tail[q]->p_nextready = rp;		/* chain tail of queue */	
-      rdy_tail[q] = rp;				/* set new queue tail */
-      rp->p_nextready = NULL;		/* mark new end */
+      bkt_head = get_cpu_var(rp->p_cpu, buckets_head);
+      bkt_tail = get_cpu_var(rp->p_cpu, buckets_tail);
+
+      if (!bkt_head[bucket_nr]) {
+          bkt_head[bucket_nr] = bkt_tail[bucket_nr] = rp;
+          rp->p_nextready = NULL;
+      }
+      else {
+          bkt_tail[bucket_nr]->p_nextready = rp;
+          bkt_tail[bucket_nr] = rp;
+          rp->p_nextready = NULL;
+      }
+  }
+  else {
+      rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
+      rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
+
+      /* Now add the process to the queue. */
+      if (!rdy_head[q]) {        /* add to empty queue */
+          rdy_head[q] = rdy_tail[q] = rp;        /* create a new queue */
+          rp->p_nextready = NULL;        /* mark new end */
+      } else {                    /* add to tail of queue */
+          rdy_tail[q]->p_nextready = rp;        /* chain tail of queue */
+          rdy_tail[q] = rp;                /* set new queue tail */
+          rp->p_nextready = NULL;        /* mark new end */
+      }
   }
 
   if (cpuid == rp->p_cpu) {
@@ -1602,7 +1619,7 @@ static void enqueue_head(struct proc *rp)
 {
   const int q = rp->p_priority;	 		/* scheduling queue to use */
 
-  struct proc **rdy_head, **rdy_tail;
+  struct proc **rdy_head, **rdy_tail, **bkt_head, **bkt_tail;
 
   assert(proc_ptr_ok(rp));
   assert(proc_is_runnable(rp));
@@ -1615,17 +1632,33 @@ static void enqueue_head(struct proc *rp)
 
   assert(q >= 0);
 
+  if (q == BUCKET_Q) {
+    int bucket_nr = rp->p_bucket_nr;
 
-  rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
-  rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
+    bkt_head = get_cpu_var(rp->p_cpu, buckets_head);
+    bkt_tail = get_cpu_var(rp->p_cpu, buckets_tail);
 
-  /* Now add the process to the queue. */
-  if (!rdy_head[q]) {		/* add to empty queue */
-	rdy_head[q] = rdy_tail[q] = rp; 	/* create a new queue */
-	rp->p_nextready = NULL;			/* mark new end */
-  } else {					/* add to head of queue */
-	rp->p_nextready = rdy_head[q];		/* chain head of queue */
-	rdy_head[q] = rp;			/* set new queue head */
+    if (!bkt_head[bucket_nr]) {
+        bkt_head[bucket_nr] = bkt_tail[bucket_nr] = rp;
+        rp->p_nextready = NULL;
+    }
+    else {
+        rp->p_nextready = bkt_head[bucket_nr];
+        bkt_head[bucket_nr] = rp;
+    }
+  }
+  else {
+      rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
+      rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
+
+      /* Now add the process to the queue. */
+      if (!rdy_head[q]) {        /* add to empty queue */
+          rdy_head[q] = rdy_tail[q] = rp;    /* create a new queue */
+          rp->p_nextready = NULL;            /* mark new end */
+      } else {                    /* add to head of queue */
+          rp->p_nextready = rdy_head[q];        /* chain head of queue */
+          rdy_head[q] = rp;            /* set new queue head */
+      }
   }
 
   /* Make note of when this process was added to queue */
@@ -1659,7 +1692,7 @@ void dequeue(struct proc *rp)
   struct proc *prev_xp;
   u64_t tsc, tsc_delta;
 
-  struct proc **rdy_tail;
+  struct proc **rdy_tail, **bkt_tail;
 
   assert(proc_ptr_ok(rp));
   assert(!proc_is_runnable(rp));
@@ -1668,23 +1701,41 @@ void dequeue(struct proc *rp)
   assert (!iskernelp(rp) || *priv(rp)->s_stack_guard == STACK_GUARD);
 
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
+  bkt_tail = get_cpu_var(rp->p_cpu, buckets_tail);
+  int bucket_nr = rp->p_bucket_nr;
 
   /* Now make sure that the process is not in its ready queue. Remove the 
    * process if it is found. A process can be made unready even if it is not 
    * running by being sent a signal that kills it.
    */
-  prev_xp = NULL;				
-  for (xpp = get_cpu_var_ptr(rp->p_cpu, run_q_head[q]); *xpp;
-		  xpp = &(*xpp)->p_nextready) {
-      if (*xpp == rp) {				/* found process to remove */
-          *xpp = (*xpp)->p_nextready;		/* replace with next chain */
-          if (rp == rdy_tail[q]) {		/* queue tail removed */
-              rdy_tail[q] = prev_xp;		/* set new tail */
-	  }
+  prev_xp = NULL;
+  if (q == BUCKET_Q) {
+      for (xpp = get_cpu_var_ptr(rp->p_cpu, buckets_head[bucket_nr]); *xpp;
+           xpp = &(*xpp)->p_nextready) {
+          if (*xpp == rp) {                /* found process to remove */
+              *xpp = (*xpp)->p_nextready;        /* replace with next chain */
+              if (rp == bkt_tail[bucket_nr]) {        /* queue tail removed */
+                  bkt_tail[bucket_nr] = prev_xp;        /* set new tail */
+              }
 
-          break;
+              break;
+          }
+          prev_xp = *xpp;                /* save previous in chain */
       }
-      prev_xp = *xpp;				/* save previous in chain */
+  }
+  else {
+      for (xpp = get_cpu_var_ptr(rp->p_cpu, run_q_head[q]); *xpp;
+           xpp = &(*xpp)->p_nextready) {
+          if (*xpp == rp) {                /* found process to remove */
+              *xpp = (*xpp)->p_nextready;        /* replace with next chain */
+              if (rp == rdy_tail[q]) {        /* queue tail removed */
+                  rdy_tail[q] = prev_xp;        /* set new tail */
+              }
+
+              break;
+          }
+          prev_xp = *xpp;                /* save previous in chain */
+      }
   }
 
 	
@@ -1720,16 +1771,33 @@ static struct proc * pick_proc(void)
  * This function always uses the run queues of the local cpu!
  */
   register struct proc *rp;			/* process to run */
-  struct proc **rdy_head;
+  struct proc **rdy_head, **bkt_head;
   int q;				/* iterate over queues */
+  int bucket, i;
 
   /* Check each of the scheduling queues for ready processes. The number of
    * queues is defined in proc.h, and priorities are set in the task table.
    * If there are no processes ready to run, return NULL.
    */
   rdy_head = get_cpulocal_var(run_q_head);
-  for (q=0; q < NR_SCHED_QUEUES; q++) {	
-	if(!(rp = rdy_head[q])) {
+  for (q=0; q < NR_SCHED_QUEUES; q++) {
+    if (q == BUCKET_Q) {
+        bucket = get_cpulocal_var(next_bucket);
+        bkt_head = get_cpulocal_var(buckets_head);
+        for (i = 0; i < NR_BUCKETS; i++) {
+            int curr_bucket = (bucket + i) % NR_BUCKETS;
+            if ((rp = bkt_head[curr_bucket])) {
+                break;
+            }
+        }
+
+        if (!rp) {
+            continue;
+        }
+
+        get_cpulocal_var(next_bucket) = (bucket + i + 1) % NR_BUCKETS;
+    }
+	else if(!(rp = rdy_head[q])) {
 		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););
 		continue;
 	}

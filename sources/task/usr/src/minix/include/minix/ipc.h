@@ -988,8 +988,9 @@ typedef struct {
 	int quantum;
 	int priority;
 	int cpu;
+    int bucket_nr;
 
-	uint8_t padding[40];
+	uint8_t padding[36];
 } mess_lsys_krn_schedule;
 _ASSERT_MSG_SIZE(mess_lsys_krn_schedule);
 
@@ -2216,7 +2217,6 @@ typedef struct {
 		mess_pm_lsys_getprocnr	m_pm_lsys_getprocnr;
 		mess_pm_lsys_sigs_signal m_pm_lsys_sigs_signal;
 		mess_pm_sched_scheduling_set_nice m_pm_sched_scheduling_set_nice;
-        mess_pm_sched_scheduling_set_bucket m_pm_sched_scheduling_set_bucket;
 		mess_readclock_lc_rtcdev m_readclock_lc_rtcdev;
 		mess_rs_init		m_rs_init;
 		mess_rs_pm_exec_restart	m_rs_pm_exec_restart;
@@ -2260,6 +2260,7 @@ typedef struct {
 		mess_vm_vfs_mmap	m_vm_vfs_mmap;
 		mess_vmmcp		m_vmmcp;
 		mess_vmmcp_reply	m_vmmcp_reply;
+        mess_pm_sched_scheduling_set_bucket m_pm_sched_scheduling_set_bucket;
 
 		u8_t size[56];	/* message payload may have 56 bytes at most */
 	};

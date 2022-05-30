@@ -246,9 +246,9 @@ minix_timer_t *tp;		/* pointer to timer structure */
 static void load_update(void)
 {
 	u16_t slot;
-	int enqueued = 0, q;
+	int enqueued = 0, q, b;
 	struct proc *p;
-	struct proc **rdy_head;
+	struct proc **rdy_head, **bkt_head;
 
 	/* Load average data is stored as a list of numbers in a circular
 	 * buffer. Each slot accumulates _LOAD_UNIT_SECS of samples of
@@ -265,10 +265,20 @@ static void load_update(void)
 	rdy_head = get_cpulocal_var(run_q_head);
 	/* Cumulation. How many processes are ready now? */
 	for(q = 0; q < NR_SCHED_QUEUES; q++) {
+        if (q == BUCKET_Q) {
+            continue;
+        }
 		for(p = rdy_head[q]; p != NULL; p = p->p_nextready) {
 			enqueued++;
 		}
 	}
+
+    bkt_head = get_cpulocal_var(buckets_head);
+    for (b = 0; b < NR_BUCKETS; b++) {
+        for (p = bkt_head[b]; p != NULL; p = p->p_nextready) {
+            enqueued++;
+        }
+    }
 
 	kloadinfo.proc_load_history[slot] += enqueued;
 

@@ -25,17 +25,21 @@ static void balance_queues(minix_timer_t *tp);
 #define SCHEDULE_CHANGE_PRIO	0x1
 #define SCHEDULE_CHANGE_QUANTUM	0x2
 #define SCHEDULE_CHANGE_CPU	0x4
+#define SCHEDULE_CHANGE_BUCKET 0x8
 
 #define SCHEDULE_CHANGE_ALL	(	\
 		SCHEDULE_CHANGE_PRIO	|	\
 		SCHEDULE_CHANGE_QUANTUM	|	\
-		SCHEDULE_CHANGE_CPU		\
+		SCHEDULE_CHANGE_CPU		|      \
+        SCHEDULE_CHANGE_BUCKET  \
 		)
 
 #define schedule_process_local(p)	\
 	schedule_process(p, SCHEDULE_CHANGE_PRIO | SCHEDULE_CHANGE_QUANTUM)
 #define schedule_process_migrate(p)	\
 	schedule_process(p, SCHEDULE_CHANGE_CPU)
+#define schedule_process_bucket(p) \
+    schedule_process(p, SCHEDULE_CHANGE_BUCKET | SCHEDULE_CHANGE_QUANTUM)
 
 #define CPU_DEAD	-1
 
@@ -89,6 +93,7 @@ static void pick_cpu(struct schedproc * proc)
 
 int do_noquantum(message *m_ptr)
 {
+    printf("noquantum\n");
 	register struct schedproc *rmp;
 	int rv, proc_nr_n;
 
@@ -99,8 +104,13 @@ int do_noquantum(message *m_ptr)
 	}
 
 	rmp = &schedproc[proc_nr_n];
-	if (rmp->priority < MIN_USER_Q) {
-		rmp->priority += 1; /* lower priority */
+	if (rmp->priority < MIN_USER_Q && rmp->priority != BUCKET_Q) {
+        if (rmp->priority == BUCKET_Q - 1) {
+            rmp->priority += 2; /* lower priority */
+        }
+        else {
+            rmp->priority += 1;
+        }
 	}
 
 	if ((rv = schedule_process_local(rmp)) != OK) {
@@ -114,6 +124,7 @@ int do_noquantum(message *m_ptr)
  *===========================================================================*/
 int do_stop_scheduling(message *m_ptr)
 {
+    printf("stop_scheduling\n");
 	register struct schedproc *rmp;
 	int proc_nr_n;
 
@@ -133,6 +144,7 @@ int do_stop_scheduling(message *m_ptr)
 	cpu_proc[rmp->cpu]--;
 #endif
 	rmp->flags = 0; /*&= ~IN_USE;*/
+    rmp->bucket_nr = 0;
 
 	return OK;
 }
@@ -142,6 +154,7 @@ int do_stop_scheduling(message *m_ptr)
  *===========================================================================*/
 int do_start_scheduling(message *m_ptr)
 {
+    printf("start_scheduling\n");
 	register struct schedproc *rmp;
 	int rv, proc_nr_n, parent_nr_n;
 	
@@ -164,6 +177,7 @@ int do_start_scheduling(message *m_ptr)
 	rmp->endpoint     = m_ptr->m_lsys_sched_scheduling_start.endpoint;
 	rmp->parent       = m_ptr->m_lsys_sched_scheduling_start.parent;
 	rmp->max_priority = m_ptr->m_lsys_sched_scheduling_start.maxprio;
+    rmp->bucket_nr = 0;
 	if (rmp->max_priority >= NR_SCHED_QUEUES) {
 		return EINVAL;
 	}
@@ -174,7 +188,7 @@ int do_start_scheduling(message *m_ptr)
 	if (rmp->endpoint == rmp->parent) {
 		/* We have a special case here for init, which is the first
 		   process scheduled, and the parent of itself. */
-		rmp->priority   = USER_Q;
+		rmp->priority   = BUCKET_Q;
 		rmp->time_slice = DEFAULT_USER_TIME_SLICE;
 
 		/*
@@ -195,7 +209,7 @@ int do_start_scheduling(message *m_ptr)
 		/* We have a special case here for system processes, for which
 		 * quanum and priority are set explicitly rather than inherited 
 		 * from the parent */
-		rmp->priority   = rmp->max_priority;
+		rmp->priority   = BUCKET_Q;
 		rmp->time_slice = m_ptr->m_lsys_sched_scheduling_start.quantum;
 		break;
 		
@@ -209,6 +223,10 @@ int do_start_scheduling(message *m_ptr)
 
 		rmp->priority = schedproc[parent_nr_n].priority;
 		rmp->time_slice = schedproc[parent_nr_n].time_slice;
+        rmp->bucket_nr = schedproc[parent_nr_n].bucket_nr;
+
+//        printf("inherit: bucket_nr=%d\n", rmp->bucket_nr);
+
 		break;
 		
 	default: 
@@ -256,6 +274,7 @@ int do_start_scheduling(message *m_ptr)
  *===========================================================================*/
 int do_nice(message *m_ptr)
 {
+    printf("nice\n");
 	struct schedproc *rmp;
 	int rv;
 	int proc_nr_n;
@@ -300,41 +319,35 @@ int do_nice(message *m_ptr)
  *===========================================================================*/
 int do_set_bucket(message *m_ptr)
 {
+    printf("set_bucket\n");
     struct schedproc *rmp;
     int rv;
     int proc_nr_n;
-    unsigned new_q, old_q, old_max_q;
-
-    printf("XDDDDDDDDDDDDD\n");
+    unsigned new_bkt, old_bkt;
 
     /* check who can send you requests */
     if (!accept_message(m_ptr))
         return EPERM;
 
-    if (sched_isokendpt(m_ptr->m_pm_sched_scheduling_set_nice.endpoint, &proc_nr_n) != OK) {
+    if (sched_isokendpt(m_ptr->m_pm_sched_scheduling_set_bucket.endpoint, &proc_nr_n) != OK) {
         printf("SCHED: WARNING: got an invalid endpoint in OoQ msg "
-               "%d\n", m_ptr->m_pm_sched_scheduling_set_nice.endpoint);
+               "%d\n", m_ptr->m_pm_sched_scheduling_set_bucket.endpoint);
         return EBADEPT;
     }
 
     rmp = &schedproc[proc_nr_n];
-    new_q = m_ptr->m_pm_sched_scheduling_set_nice.maxprio;
-    if (new_q >= NR_SCHED_QUEUES) {
-        return EINVAL;
-    }
+    new_bkt = m_ptr->m_pm_sched_scheduling_set_bucket.bucket_nr;
 
     /* Store old values, in case we need to roll back the changes */
-    old_q     = rmp->priority;
-    old_max_q = rmp->max_priority;
+    old_bkt     = rmp->bucket_nr;
 
     /* Update the proc entry and reschedule the process */
-    rmp->max_priority = rmp->priority = new_q;
+    rmp->bucket_nr = new_bkt;
 
-    if ((rv = schedule_process_local(rmp)) != OK) {
+    if ((rv = schedule_process_bucket(rmp)) != OK) {
         /* Something went wrong when rescheduling the process, roll
          * back the changes to proc struct */
-        rmp->priority     = old_q;
-        rmp->max_priority = old_max_q;
+        rmp->bucket_nr     = old_bkt;
     }
 
     return rv;
@@ -345,8 +358,9 @@ int do_set_bucket(message *m_ptr)
  *===========================================================================*/
 static int schedule_process(struct schedproc * rmp, unsigned flags)
 {
+//    printf("schedule_process\n");
 	int err;
-	int new_prio, new_quantum, new_cpu;
+	int new_prio, new_quantum, new_cpu, new_bucket;
 
 	pick_cpu(rmp);
 
@@ -365,8 +379,15 @@ static int schedule_process(struct schedproc * rmp, unsigned flags)
 	else
 		new_cpu = -1;
 
+    if (flags & SCHEDULE_CHANGE_BUCKET)
+        new_bucket = rmp->bucket_nr;
+    else
+        new_bucket = -1;
+
+//    printf("schedule_process: bucket_nr=%d\n", new_bucket);
+
 	if ((err = sys_schedule(rmp->endpoint, new_prio,
-		new_quantum, new_cpu)) != OK) {
+		new_quantum, new_cpu, new_bucket)) != OK) {
 		printf("PM: An error occurred when trying to schedule %d: %d\n",
 		rmp->endpoint, err);
 	}
@@ -401,9 +422,14 @@ static void balance_queues(minix_timer_t *tp)
 	int proc_nr;
 
 	for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
-		if (rmp->flags & IN_USE) {
+		if (rmp->flags & IN_USE && rmp->priority != BUCKET_Q) {
 			if (rmp->priority > rmp->max_priority) {
-				rmp->priority -= 1; /* increase priority */
+                if (rmp->priority == BUCKET_Q + 1) {
+                    rmp->priority -= 2;
+                }
+                else {
+                    rmp->priority -= 1; /* increase priority */
+                }
 				schedule_process_local(rmp);
 			}
 		}
