@@ -72,9 +72,10 @@ DECLARE_CPULOCAL(struct proc *, ptproc);
 DECLARE_CPULOCAL(struct proc *, run_q_head[NR_SCHED_QUEUES]); /* ptrs to ready list headers */
 DECLARE_CPULOCAL(struct proc *, run_q_tail[NR_SCHED_QUEUES]); /* ptrs to ready list tails */
 
-DECLARE_CPULOCAL(struct proc *, buckets_head[NR_BUCKETS]);
-DECLARE_CPULOCAL(struct proc *, buckets_tail[NR_BUCKETS]);
-DECLARE_CPULOCAL(int, next_bucket);
+DECLARE_CPULOCAL(struct proc *, buckets_head[NR_BUCKETS]); /* ptrs to buckets headers */
+DECLARE_CPULOCAL(struct proc *, buckets_tail[NR_BUCKETS]); /* ptrs to buckets tails */
+
+DECLARE_CPULOCAL(int, next_bucket_nr); /* number of the next bucket to wake */
 
 DECLARE_CPULOCAL(volatile int, cpu_is_idle); /* let the others know that you are idle */
 

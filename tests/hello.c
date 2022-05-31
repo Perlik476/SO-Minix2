@@ -16,20 +16,31 @@ int main(){
 //
 //    printf("do_setbucket: %d (errno=%d)\n", res, errno);
 
+    printf("%d\n", set_bucket(-1));
+    printf("%d\n", errno);
+    printf("%d\n", set_bucket(NR_BUCKETS));
+    printf("%d\n", errno);
     errno = 0;
-    printf("set_bucket(5): %d (errno=%d)\n", set_bucket(5), errno);
+    printf("%d\n", set_bucket(0));
+    printf("%d\n", errno);
 
-    errno = 0;
-    printf("set_bucket(7): %d (errno=%d)\n", set_bucket(7), errno);
-
-    if (!fork()) {
-        errno = 0;
-        printf("set_bucket(10): %d (errno=%d)\n", set_bucket(3), errno);
-    }
-    else {
-        errno = 0;
-        printf("set_bucket(10): %d (errno=%d)\n", set_bucket(8), errno);
-    }
+//    errno = 0;
+//    printf("set_bucket(5): %d (errno=%d)\n", set_bucket(5), errno);
+//
+//    errno = 0;
+//    printf("set_bucket(7): %d (errno=%d)\n", set_bucket(7), errno);
+//
+//    if (!fork()) {
+//        errno = 0;
+//        printf("child: set_bucket(10): %d (errno=%d)\n", set_bucket(3), errno);
+//    }
+//    else {
+//        errno = 0;
+//        printf("parent: set_bucket(10): %d (errno=%d)\n", set_bucket(8), errno);
+//
+//        errno = 0;
+//        printf("parent: set_bucket(-1): %d (errno=%d)\n", set_bucket(-1), errno);
+//    }
 
     return 0;
 }

@@ -69,9 +69,6 @@
 /* default scheduling quanta */
 #define USER_QUANTUM 200
 
-#define BUCKET_Q 8
-#define NR_BUCKETS 10
-
 /* defualt user process cpu */
 #define USER_DEFAULT_CPU	-1 /* use the default cpu or do not change the
 				      current one */

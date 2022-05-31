@@ -1772,8 +1772,8 @@ static struct proc * pick_proc(void)
  */
   register struct proc *rp;			/* process to run */
   struct proc **rdy_head, **bkt_head;
-  int q;				/* iterate over queues */
-  int bucket, i;
+  int q, i;				/* iterate over queues */
+  int bucket_nr;
 
   /* Check each of the scheduling queues for ready processes. The number of
    * queues is defined in proc.h, and priorities are set in the task table.
@@ -1782,10 +1782,10 @@ static struct proc * pick_proc(void)
   rdy_head = get_cpulocal_var(run_q_head);
   for (q=0; q < NR_SCHED_QUEUES; q++) {
     if (q == BUCKET_Q) {
-        bucket = get_cpulocal_var(next_bucket);
         bkt_head = get_cpulocal_var(buckets_head);
+        bucket_nr = get_cpulocal_var(next_bucket_nr);
         for (i = 0; i < NR_BUCKETS; i++) {
-            int current_bucket = (bucket + i) % NR_BUCKETS;
+            int current_bucket = (bucket_nr + i) % NR_BUCKETS;
             if ((rp = bkt_head[current_bucket]) != NULL) {
                 break;
             }
@@ -1794,7 +1794,7 @@ static struct proc * pick_proc(void)
             continue;
         }
 
-        get_cpulocal_var(next_bucket) = (bucket + i + 1) % NR_BUCKETS;
+        get_cpulocal_var(next_bucket_nr) = (bucket_nr + i + 1) % NR_BUCKETS;
     }
 	else if(!(rp = rdy_head[q])) {
 		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););

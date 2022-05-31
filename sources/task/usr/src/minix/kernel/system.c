@@ -631,7 +631,7 @@ int sched_proc(struct proc *p,
 	if (quantum < 1 && quantum != -1)
 		return(EINVAL);
 
-    if (bucket_nr >= NR_BUCKETS || (bucket_nr < 0 && bucket_nr != -1))
+    if ((bucket_nr < 0 && bucket_nr != -1) || bucket_nr >= NR_BUCKETS)
         return(EINVAL);
 
 #ifdef CONFIG_SMP

@@ -265,12 +265,11 @@ static void load_update(void)
 	rdy_head = get_cpulocal_var(run_q_head);
 	/* Cumulation. How many processes are ready now? */
 	for(q = 0; q < NR_SCHED_QUEUES; q++) {
-        if (q == BUCKET_Q) {
-            continue;
+        if (q != BUCKET_Q) {
+            for(p = rdy_head[q]; p != NULL; p = p->p_nextready) {
+                enqueued++;
+            }
         }
-		for(p = rdy_head[q]; p != NULL; p = p->p_nextready) {
-			enqueued++;
-		}
 	}
 
     bkt_head = get_cpulocal_var(buckets_head);

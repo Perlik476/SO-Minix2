@@ -181,6 +181,7 @@ int main() {
 		{9, 1}
 	);
 
+    printf("illegals:\n");
 	// Checking illegal bucket numbers.
 	assert(set_bucket(-1) == -1);
 	assert(errno == EINVAL);

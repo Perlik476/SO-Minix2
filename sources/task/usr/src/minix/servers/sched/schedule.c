@@ -13,7 +13,6 @@
 #include <minix/com.h>
 #include <machine/archtypes.h>
 #include "kernel/proc.h" /* for queue constants */
-#include "stdio.h"
 
 static minix_timer_t sched_timer;
 static unsigned balance_timeout;
@@ -37,10 +36,10 @@ static void balance_queues(minix_timer_t *tp);
 
 #define schedule_process_local(p)	\
 	schedule_process(p, SCHEDULE_CHANGE_PRIO | SCHEDULE_CHANGE_QUANTUM)
-#define schedule_process_migrate(p)	\
-	schedule_process(p, SCHEDULE_CHANGE_CPU)
 #define schedule_process_bucket(p) \
     schedule_process(p, SCHEDULE_CHANGE_BUCKET | SCHEDULE_CHANGE_QUANTUM)
+#define schedule_process_migrate(p)	\
+	schedule_process(p, SCHEDULE_CHANGE_CPU)
 
 #define CPU_DEAD	-1
 
@@ -105,8 +104,8 @@ int do_noquantum(message *m_ptr)
 
 	rmp = &schedproc[proc_nr_n];
 	if (rmp->priority < MIN_USER_Q && rmp->priority != BUCKET_Q) {
-        if (rmp->priority == BUCKET_Q - 1) {
-            rmp->priority += 2; /* lower priority */
+        if (rmp->priority + 1 == BUCKET_Q) {
+            rmp->priority += 2;
         }
         else {
             rmp->priority += 1;
@@ -143,7 +142,6 @@ int do_stop_scheduling(message *m_ptr)
 	cpu_proc[rmp->cpu]--;
 #endif
 	rmp->flags = 0; /*&= ~IN_USE;*/
-    rmp->bucket_nr = 0;
 
 	return OK;
 }
@@ -322,7 +320,7 @@ int do_set_bucket(message *m_ptr)
     struct schedproc *rmp;
     int rv;
     int proc_nr_n;
-    unsigned new_bkt, old_bkt;
+    int new_bkt, old_bkt;
 
     /* check who can send you requests */
     if (!accept_message(m_ptr))
@@ -338,7 +336,7 @@ int do_set_bucket(message *m_ptr)
     new_bkt = m_ptr->m_pm_sched_scheduling_set_bucket.bucket_nr;
 
     /* Store old values, in case we need to roll back the changes */
-    old_bkt     = rmp->bucket_nr;
+    old_bkt = rmp->bucket_nr;
 
     /* Update the proc entry and reschedule the process */
     rmp->bucket_nr = new_bkt;
@@ -384,7 +382,6 @@ static int schedule_process(struct schedproc * rmp, unsigned flags)
 
 	if ((err = sys_schedule(rmp->endpoint, new_prio,
 		new_quantum, new_cpu, new_bucket)) != OK) {
-        printf("schedule_process: bucket_nr=%d\n", new_bucket);
 
 		printf("PM: An error occurred when trying to schedule %d: %d\n",
 		rmp->endpoint, err);
@@ -402,6 +399,7 @@ void init_scheduling(void)
 {
 	balance_timeout = BALANCE_TIMEOUT * sys_hz();
 	init_timer(&sched_timer);
+    set_timer(&sched_timer, balance_timeout, balance_queues, 0);
 }
 
 /*===========================================================================*
@@ -413,3 +411,24 @@ void init_scheduling(void)
  * quantum. This function will find all proccesses that have been bumped down,
  * and pulls them back up. This default policy will soon be changed.
  */
+static void balance_queues(minix_timer_t *tp)
+{
+    struct schedproc *rmp;
+    int proc_nr;
+
+    for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
+        if (rmp->flags & IN_USE && rmp->priority != BUCKET_Q) {
+            if (rmp->priority > rmp->max_priority) {
+                if (rmp->priority - 1 == BUCKET_Q) {
+                    rmp->priority -= 2;
+                }
+                else {
+                    rmp->priority -= 1;
+                }
+                schedule_process_local(rmp);
+            }
+        }
+    }
+
+    set_timer(&sched_timer, balance_timeout, balance_queues, 0);
+}

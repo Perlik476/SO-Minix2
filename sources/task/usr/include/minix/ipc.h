@@ -1588,14 +1588,6 @@ typedef struct {
 _ASSERT_MSG_SIZE(mess_pm_sched_scheduling_set_nice);
 
 typedef struct {
-    endpoint_t endpoint;
-    int bucket_nr;
-
-    uint8_t padding[48];
-} mess_pm_sched_scheduling_set_bucket;
-_ASSERT_MSG_SIZE(mess_pm_sched_scheduling_set_bucket);
-
-typedef struct {
 	int status;
 
 	uint8_t padding[52];
@@ -2216,7 +2208,6 @@ typedef struct {
 		mess_pm_lsys_getprocnr	m_pm_lsys_getprocnr;
 		mess_pm_lsys_sigs_signal m_pm_lsys_sigs_signal;
 		mess_pm_sched_scheduling_set_nice m_pm_sched_scheduling_set_nice;
-        mess_pm_sched_scheduling_set_bucket m_pm_sched_scheduling_set_bucket;
 		mess_readclock_lc_rtcdev m_readclock_lc_rtcdev;
 		mess_rs_init		m_rs_init;
 		mess_rs_pm_exec_restart	m_rs_pm_exec_restart;

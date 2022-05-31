@@ -1,5 +1,4 @@
 #include "syslib.h"
-#include "stdio.h"
 
 int sys_schedule(endpoint_t proc_ep,
 			int priority,
