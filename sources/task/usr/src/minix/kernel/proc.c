@@ -1785,13 +1785,12 @@ static struct proc * pick_proc(void)
         bucket = get_cpulocal_var(next_bucket);
         bkt_head = get_cpulocal_var(buckets_head);
         for (i = 0; i < NR_BUCKETS; i++) {
-            int curr_bucket = (bucket + i) % NR_BUCKETS;
-            if ((rp = bkt_head[curr_bucket])) {
+            int current_bucket = (bucket + i) % NR_BUCKETS;
+            if ((rp = bkt_head[current_bucket]) != NULL) {
                 break;
             }
         }
-
-        if (!rp) {
+        if (rp == NULL) {
             continue;
         }
 

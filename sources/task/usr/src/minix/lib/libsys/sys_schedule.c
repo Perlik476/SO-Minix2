@@ -1,4 +1,5 @@
 #include "syslib.h"
+#include "stdio.h"
 
 int sys_schedule(endpoint_t proc_ep,
 			int priority,
@@ -6,7 +7,6 @@ int sys_schedule(endpoint_t proc_ep,
 			int cpu,
             int bucket_nr)
 {
-//    printf("sys_schedule: bucket_nr=%d\n", bucket_nr);
 	message m;
 
 	m.m_lsys_krn_schedule.endpoint = proc_ep;

@@ -624,22 +624,15 @@ int sched_proc(struct proc *p,
 			int cpu,
             int bucket_nr)
 {
-    printf("sched_proc\n");
 	/* Make sure the values given are within the allowed range.*/
 	if ((priority < TASK_Q && priority != -1) || priority > NR_SCHED_QUEUES)
 		return(EINVAL);
-    printf("sched_proc: priority ok\n");
 
 	if (quantum < 1 && quantum != -1)
 		return(EINVAL);
 
-    printf("sched_proc: quantum ok\n");
-
-    printf("sched_proc: bucket_nr=%d=%d (nr_buckets=%d, bucket_q=%d)\n", bucket_nr, p->p_bucket_nr, NR_BUCKETS, BUCKET_Q);
     if (bucket_nr >= NR_BUCKETS || (bucket_nr < 0 && bucket_nr != -1))
         return(EINVAL);
-
-    printf("sched_proc: buckets ok\n");
 
 #ifdef CONFIG_SMP
 	if ((cpu < 0 && cpu != -1) || (cpu > 0 && (unsigned) cpu >= ncpus))

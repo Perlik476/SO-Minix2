@@ -72,7 +72,7 @@ void print(std::vector<int> v) {
 int main() {
 	std::cout << "Each test should run in at most 60 seconds." << std::endl;
 
-	// Test from 4-example.c (first testcase).
+	// 0 Test from 4-example.c (first testcase).
 	assert(
 		get_order(
 			{just_work_for(15), just_work_for(0.5), just_work_for(0.5), just_work_for(0.5), just_work_for(0.5)},
@@ -80,7 +80,7 @@ int main() {
 		).back() == 0
 	);
 
-	// Test from 4-example.c (second testcase).
+	// 1 Test from 4-example.c (second testcase).
 	assert(
 		get_order(
 			{just_work_for(3), just_work_for(2), just_work_for(2), just_work_for(2), just_work_for(2)},
@@ -88,7 +88,7 @@ int main() {
 		)[0] == 0
 	);
 
-	// Checking whether the default bucket of a process is bucket 0.
+	// 2 Checking whether the default bucket of a process is bucket 0.
 	assert(
 		get_order(
 			{just_work_for(1), just_work_for(1.5)},
@@ -96,7 +96,7 @@ int main() {
 		)[0] == 1 
 	); // (because there are some background user processes in the default bucket)
 
-	// Checking whether changing buckets works.
+	// 3 Checking whether changing buckets works.
 	assert(
 		get_order(
 			{
@@ -115,7 +115,7 @@ int main() {
 		) == (std::vector<int>{1, 0, 2, 3})
 	);
 
-
+    // 4
 	assert(
 		get_order(
 			{
@@ -135,7 +135,7 @@ int main() {
 			{9, 1, 2, 3, 4}
 		)[4] == 4
 	);
-
+    // 5
 	assert(
 		get_order(
 			{
@@ -153,7 +153,7 @@ int main() {
 		) == (std::vector<int>{0, 3, 1, 2})
 	);
 
-	// Changing buckets in presence of other processes.
+	// 6 Changing buckets in presence of other processes.
 	get_order(
 		{
 			[] {
@@ -169,7 +169,7 @@ int main() {
 		{9, 1, 1, 1, 2, 2}
 	);
 
-	// Changing to all possible buckets.
+	// 7 Changing to all possible buckets.
 	get_order(
 		{
 			[] {
@@ -202,6 +202,7 @@ int main() {
 	printf("Set nice errno: %d\n", errno);
 	printf("Errno meaning: %s\n", strerror(errno));
 
+    // 8
 	assert(
 		get_order(
 			{
@@ -229,7 +230,7 @@ int main() {
 		)[0] == 2
 	);
 
-	// Tests from 4-example.c, but for each pair of buckets greater than 0.
+	// 9+ Tests from 4-example.c, but for each pair of buckets greater than 0.
 	for (int b0 = 1; b0 < NR_BUCKETS; ++b0)
 		for (int b1 = 1; b1 < NR_BUCKETS; ++b1)
 			if (b0 != b1) {

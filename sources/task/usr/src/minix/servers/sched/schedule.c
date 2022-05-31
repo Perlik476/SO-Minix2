@@ -13,6 +13,7 @@
 #include <minix/com.h>
 #include <machine/archtypes.h>
 #include "kernel/proc.h" /* for queue constants */
+#include "stdio.h"
 
 static minix_timer_t sched_timer;
 static unsigned balance_timeout;
@@ -93,7 +94,6 @@ static void pick_cpu(struct schedproc * proc)
 
 int do_noquantum(message *m_ptr)
 {
-    printf("noquantum\n");
 	register struct schedproc *rmp;
 	int rv, proc_nr_n;
 
@@ -124,7 +124,6 @@ int do_noquantum(message *m_ptr)
  *===========================================================================*/
 int do_stop_scheduling(message *m_ptr)
 {
-    printf("stop_scheduling\n");
 	register struct schedproc *rmp;
 	int proc_nr_n;
 
@@ -154,7 +153,6 @@ int do_stop_scheduling(message *m_ptr)
  *===========================================================================*/
 int do_start_scheduling(message *m_ptr)
 {
-    printf("start_scheduling\n");
 	register struct schedproc *rmp;
 	int rv, proc_nr_n, parent_nr_n;
 	
@@ -225,8 +223,6 @@ int do_start_scheduling(message *m_ptr)
 		rmp->time_slice = schedproc[parent_nr_n].time_slice;
         rmp->bucket_nr = schedproc[parent_nr_n].bucket_nr;
 
-//        printf("inherit: bucket_nr=%d\n", rmp->bucket_nr);
-
 		break;
 		
 	default: 
@@ -274,7 +270,6 @@ int do_start_scheduling(message *m_ptr)
  *===========================================================================*/
 int do_nice(message *m_ptr)
 {
-    printf("nice\n");
 	struct schedproc *rmp;
 	int rv;
 	int proc_nr_n;
@@ -291,6 +286,11 @@ int do_nice(message *m_ptr)
 	}
 
 	rmp = &schedproc[proc_nr_n];
+
+    if (rmp->priority == BUCKET_Q) {
+        return EINVAL;
+    }
+
 	new_q = m_ptr->m_pm_sched_scheduling_set_nice.maxprio;
 	if (new_q >= NR_SCHED_QUEUES) {
 		return EINVAL;
@@ -319,7 +319,6 @@ int do_nice(message *m_ptr)
  *===========================================================================*/
 int do_set_bucket(message *m_ptr)
 {
-    printf("set_bucket\n");
     struct schedproc *rmp;
     int rv;
     int proc_nr_n;
@@ -358,7 +357,6 @@ int do_set_bucket(message *m_ptr)
  *===========================================================================*/
 static int schedule_process(struct schedproc * rmp, unsigned flags)
 {
-//    printf("schedule_process\n");
 	int err;
 	int new_prio, new_quantum, new_cpu, new_bucket;
 
@@ -384,10 +382,10 @@ static int schedule_process(struct schedproc * rmp, unsigned flags)
     else
         new_bucket = -1;
 
-//    printf("schedule_process: bucket_nr=%d\n", new_bucket);
-
 	if ((err = sys_schedule(rmp->endpoint, new_prio,
 		new_quantum, new_cpu, new_bucket)) != OK) {
+        printf("schedule_process: bucket_nr=%d\n", new_bucket);
+
 		printf("PM: An error occurred when trying to schedule %d: %d\n",
 		rmp->endpoint, err);
 	}
@@ -404,7 +402,6 @@ void init_scheduling(void)
 {
 	balance_timeout = BALANCE_TIMEOUT * sys_hz();
 	init_timer(&sched_timer);
-	set_timer(&sched_timer, balance_timeout, balance_queues, 0);
 }
 
 /*===========================================================================*
@@ -416,24 +413,3 @@ void init_scheduling(void)
  * quantum. This function will find all proccesses that have been bumped down,
  * and pulls them back up. This default policy will soon be changed.
  */
-static void balance_queues(minix_timer_t *tp)
-{
-	struct schedproc *rmp;
-	int proc_nr;
-
-	for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
-		if (rmp->flags & IN_USE && rmp->priority != BUCKET_Q) {
-			if (rmp->priority > rmp->max_priority) {
-                if (rmp->priority == BUCKET_Q + 1) {
-                    rmp->priority -= 2;
-                }
-                else {
-                    rmp->priority -= 1; /* increase priority */
-                }
-				schedule_process_local(rmp);
-			}
-		}
-	}
-
-	set_timer(&sched_timer, balance_timeout, balance_queues, 0);
-}

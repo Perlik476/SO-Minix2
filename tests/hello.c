@@ -24,7 +24,11 @@ int main(){
 
     if (!fork()) {
         errno = 0;
-        printf("set_bucket(7): %d (errno=%d)\n", set_bucket(10), errno);
+        printf("set_bucket(10): %d (errno=%d)\n", set_bucket(3), errno);
+    }
+    else {
+        errno = 0;
+        printf("set_bucket(10): %d (errno=%d)\n", set_bucket(8), errno);
     }
 
     return 0;
